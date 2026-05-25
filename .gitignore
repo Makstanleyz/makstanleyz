@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+venv/
+data/
+.DS_Store
+
+# Pre-existing folders unrelated to this bot
+backend/
+frontend/
+docs/
+{backend,frontend

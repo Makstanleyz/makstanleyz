@@ -1,0 +1,288 @@
+// ╔══════════════════════════════════════════════════════════════════════════════╗
+// ║  MakStanleyz Scalping Bot — TradingView Signal Engine                      ║
+// ║  Timeframe: 1m entry + 5m trend filter                                     ║
+// ║                                                                            ║
+// ║  SETUP:                                                                    ║
+// ║  1. Open any USDT perp 1m chart on Binance Futures (e.g. SOLUSDT.P)       ║
+// ║  2. Add this indicator                                                     ║
+// ║  3. Set Webhook Secret to match your WEBHOOK_SECRET env var on Railway     ║
+// ║  4. Create alert → Condition: "MakStanleyz — Any Alert"                   ║
+// ║     Webhook URL: https://your-railway-app.up.railway.app/webhook           ║
+// ║     Message: leave blank (script builds the JSON payload itself)           ║
+// ║  5. Repeat for each symbol in SCAN_PAIRS                                   ║
+// ╚══════════════════════════════════════════════════════════════════════════════╝
+
+//@version=6
+indicator("MakStanleyz — 1m+5m Signal Engine", overlay=true, max_bars_back=500)
+
+// ─── Inputs ───────────────────────────────────────────────────────────────────
+i_secret      = input.string("YOUR_WEBHOOK_SECRET",  "Webhook Secret",                group="Webhook")
+i_min_score   = input.int(80,    "Min Score to Trade",    minval=0, maxval=100,       group="Signal")
+i_rsi_len     = input.int(14,    "RSI Length",                                        group="Signal")
+i_vol_win     = input.int(20,    "Volume Avg Window",                                 group="Signal")
+i_vol_spike   = input.float(5.0, "Vol Spike Multiplier",                              group="Signal")
+i_rsi_os      = input.int(20,    "RSI Oversold — long override",                      group="Signal")
+i_rsi_ob      = input.int(80,    "RSI Overbought — short override",                   group="Signal")
+i_gainer      = input.float(10.0,"Gainer Threshold %",                                group="Signal")
+i_loser       = input.float(-10.0,"Loser Threshold %",                                group="Signal")
+i_cooldown    = input.int(3,     "Min Bars Between Signals",                          group="Signal")
+
+// 5m trend filter — block entries that strongly oppose the 5m trend
+i_htf_filter  = input.bool(true, "Apply 5m Trend Filter (block counter-trend entries)", group="5m Filter")
+i_htf_band    = input.float(0.8, "5m EMA Band % (neutral zone)",                     group="5m Filter")
+
+i_rsi_hold_l  = input.int(70,    "RSI Exit Level (Long position)",                    group="Exit Engine")
+i_rsi_hold_s  = input.int(30,    "RSI Exit Level (Short position)",                   group="Exit Engine")
+i_confirm_bars = input.int(2,    "Exit Confirm Bars",                                 group="Exit Engine")
+i_show_sig    = input.bool(true, "Show Entry Labels",                                 group="Display")
+i_show_exit   = input.bool(true, "Show Exit Markers",                                 group="Display")
+i_show_tbl    = input.bool(true, "Show Info Table",                                   group="Display")
+
+// ─── Core Indicators (1m) ─────────────────────────────────────────────────────
+rsi       = ta.rsi(close, i_rsi_len)
+vol_avg   = ta.sma(volume, i_vol_win)
+vol_ratio = vol_avg > 0 ? volume / vol_avg : 1.0
+ema5      = ta.ema(close, 5)
+ema8      = ta.ema(close, 8)
+ema13     = ta.ema(close, 13)
+vwap_val  = ta.vwap(hlc3)
+
+// 24h change
+prev_day   = request.security(syminfo.tickerid, "D", close[1], lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+change_24h = prev_day > 0 ? (close - prev_day) / prev_day * 100 : 0.0
+
+// ─── 5m Trend Filter ──────────────────────────────────────────────────────────
+// HTF context: 5m EMA50 vs current price (1=bull, -1=bear, 0=neutral)
+// Neutral band ±i_htf_band% around EMA50 — avoids filtering in choppy conditions
+htf5_ema50  = request.security(syminfo.tickerid, "5", ta.ema(close, 50), lookahead=barmerge.lookahead_off)
+_band       = i_htf_band / 100
+htf5_state  = close > htf5_ema50 * (1 + _band) ? 1 : close < htf5_ema50 * (1 - _band) ? -1 : 0
+
+// BTC confirmation: 5m EMA21 (was 15m in Snitcher)
+btc_c     = request.security("BINANCE:BTCUSDT.P", "5", close, lookahead=barmerge.lookahead_off)
+btc_e     = request.security("BINANCE:BTCUSDT.P", "5", ta.ema(close, 21), lookahead=barmerge.lookahead_off)
+btc_state = btc_c > btc_e * 1.003 ? 1 : btc_c < btc_e * 0.997 ? -1 : 0
+
+// ─── Signal Direction ─────────────────────────────────────────────────────────
+is_gainer = change_24h >= i_gainer
+is_loser  = change_24h <= i_loser
+
+dir = ""
+dir := rsi < 30 or is_loser  ? "long"  : dir
+dir := rsi > 70 or is_gainer ? "short" : dir
+// Extreme RSI + volume spike overrides everything
+dir := rsi < i_rsi_os and vol_ratio >= i_vol_spike ? "long"  : dir
+dir := rsi > i_rsi_ob and vol_ratio >= i_vol_spike ? "short" : dir
+
+// ─── Score (exact match to calc_score in scanner.py) ─────────────────────────
+f_score(r, v, c, d) =>
+    s = 0
+    if d == "long"
+        s += r < 20 ? 40 : r < 25 ? 25 : r < 30 ? 10 : 0
+        s += v >= 5 ? 30 : v >= 3 ? 15 : 0
+        s += c < -15 ? 20 : c < -8 ? 10 : c < -3 ? 5 : 0
+    else
+        s += r > 80 ? 40 : r > 75 ? 25 : r > 70 ? 10 : 0
+        s += v >= 5 ? 30 : v >= 3 ? 15 : 0
+        s += c > 15 ? 20 : c > 8 ? 10 : c > 3 ? 5 : 0
+    math.min(s, 100)
+
+score  = dir != "" ? f_score(rsi, vol_ratio, change_24h, dir) : 0
+is_gem = score >= 80
+
+// ─── Leverage Selection ───────────────────────────────────────────────────────
+f_lev(d, h, b) =>
+    hh = d == "long" ? h : -h
+    bb = d == "long" ? b : -b
+    switch
+        hh ==  1 and bb ==  1 => 10
+        hh ==  1 and bb ==  0 => 9
+        hh ==  1 and bb == -1 => 6
+        hh ==  0 and bb ==  1 => 7
+        hh ==  0 and bb ==  0 => 5
+        hh ==  0 and bb == -1 => 4
+        hh == -1 and bb ==  1 => 4
+        hh == -1 and bb ==  0 => 3
+        => 2
+
+leverage = dir != "" ? f_lev(dir, htf5_state, btc_state) : 5
+
+// ─── 5m Trend Gate ────────────────────────────────────────────────────────────
+// Block longs when 5m is strongly bearish; block shorts when 5m is strongly bullish.
+// Neutral zone (htf5_state == 0) always passes — avoids over-filtering in chop.
+htf5_ok = not i_htf_filter or (dir == "long" ? htf5_state >= 0 : htf5_state <= 0)
+
+// ─── Cooldown & Gate ──────────────────────────────────────────────────────────
+var int last_bar = 0
+
+sig_valid = dir != "" and score >= i_min_score and htf5_ok and barstate.isconfirmed and (bar_index - last_bar >= i_cooldown)
+
+long_sig  = sig_valid and dir == "long"
+short_sig = sig_valid and dir == "short"
+
+if long_sig or short_sig
+    last_bar := bar_index
+
+// ─── Exit Engine (mirrors exit_engine.py triple-confirm logic) ────────────────
+var string last_dir = na
+
+rsi_holds  = na(last_dir) ? true : (last_dir == "long" ? rsi < i_rsi_hold_l : rsi > i_rsi_hold_s)
+ema_holds  = na(last_dir) ? true : (last_dir == "long" ? (ema5 > ema8 and ema8 > ema13) : (ema5 < ema8 and ema8 < ema13))
+vwap_holds = na(last_dir) ? true : (last_dir == "long" ? close > vwap_val : close < vwap_val)
+
+flips = (rsi_holds ? 0 : 1) + (ema_holds ? 0 : 1) + (vwap_holds ? 0 : 1)
+
+var int confirm_count = 0
+all_flipped = flips == 3 and not na(last_dir) and barstate.isconfirmed
+if all_flipped
+    confirm_count := confirm_count + 1
+else
+    confirm_count := 0
+
+triple_confirm = confirm_count >= i_confirm_bars
+caution_2of3   = flips == 2 and not na(last_dir) and barstate.isconfirmed
+
+if triple_confirm
+    last_dir      := na
+    confirm_count := 0
+if long_sig or short_sig
+    last_dir      := dir
+    confirm_count := 0
+
+// ─── JSON Helpers ─────────────────────────────────────────────────────────────
+f_ctx(d, s) =>
+    rotated = d == "long" ? s : -s
+    rotated ==  1 ? "true" : rotated == -1 ? "false" : "null"
+
+f_b(b) => b ? "true" : "false"
+
+// ─── Alert Payloads ───────────────────────────────────────────────────────────
+entry_json(action) =>
+    '{"action":"' + action + '","symbol":"' + syminfo.ticker + '","score":' + str.tostring(score) +
+     ',"price":'  + str.tostring(close, "#.######") + ',"rsi":' + str.tostring(rsi, "#.#") +
+     ',"vol_ratio":' + str.tostring(vol_ratio, "#.##") + ',"change_24h":' + str.tostring(change_24h, "#.##") +
+     ',"htf_aligned":' + f_ctx(dir, htf5_state) + ',"btc_confirms":' + f_ctx(dir, btc_state) +
+     ',"leverage":' + str.tostring(leverage) + ',"htf5_state":' + str.tostring(htf5_state) +
+     ',"fund_rate":0,"secret":"' + i_secret + '"}'
+
+exit_json = '{"action":"exit","symbol":"' + syminfo.ticker + '","price":' + str.tostring(close, "#.######") +
+     ',"exit_reason":"TRIPLE_CONFIRM","rsi":' + str.tostring(rsi, "#.#") +
+     ',"rsi_holds":' + f_b(rsi_holds) + ',"ema_holds":' + f_b(ema_holds) +
+     ',"vwap_holds":' + f_b(vwap_holds) + ',"secret":"' + i_secret + '"}'
+
+caution_json = '{"action":"caution","symbol":"' + syminfo.ticker + '","flips":' + str.tostring(flips) +
+     ',"rsi_holds":' + f_b(rsi_holds) + ',"ema_holds":' + f_b(ema_holds) +
+     ',"vwap_holds":' + f_b(vwap_holds) + ',"rsi":' + str.tostring(rsi, "#.#") +
+     ',"secret":"' + i_secret + '"}'
+
+// ─── Alert System 1: Webhook → Bot → Telegram ────────────────────────────────
+if long_sig
+    alert(entry_json("long"),  alert.freq_once_per_bar_close)
+if short_sig
+    alert(entry_json("short"), alert.freq_once_per_bar_close)
+if triple_confirm
+    alert(exit_json,           alert.freq_once_per_bar_close)
+if caution_2of3
+    alert(caution_json,        alert.freq_once_per_bar_close)
+
+// ─── Alert System 2: TradingView Native Notifications ────────────────────────
+gem_sig = (long_sig or short_sig) and is_gem
+
+alertcondition(long_sig,      title="MakStanleyz — Long Signal",
+  message="LONG {{ticker}} | Score: {{plot_0}} | 1m+5m")
+
+alertcondition(short_sig,     title="MakStanleyz — Short Signal",
+  message="SHORT {{ticker}} | Score: {{plot_0}} | 1m+5m")
+
+alertcondition(gem_sig,       title="MakStanleyz — GEM Signal ★",
+  message="★ GEM {{ticker}} | Score: {{plot_0}} | 1m+5m — HIGH CONVICTION")
+
+alertcondition(triple_confirm,title="MakStanleyz — Exit (Triple Confirm)",
+  message="EXIT {{ticker}} | RSI+EMA+VWAP all flipped")
+
+alertcondition(caution_2of3,  title="MakStanleyz — Caution 2/3",
+  message="CAUTION {{ticker}} | 2 of 3 exit conditions flipped")
+
+// ─── Plots ────────────────────────────────────────────────────────────────────
+c_gold = color.rgb(255, 215, 0)
+
+plot(score,    "Score",   color=color.new(color.yellow,  0), display=display.none)
+plot(ema5,     "EMA 5",   color=color.new(color.blue,   30), linewidth=1)
+plot(ema8,     "EMA 8",   color=color.new(color.orange, 30), linewidth=1)
+plot(ema13,    "EMA 13",  color=color.new(color.red,    30), linewidth=1)
+plot(vwap_val, "VWAP",    color=color.new(color.purple, 40), linewidth=2)
+
+// 5m EMA50 reference line
+plot(htf5_ema50, "5m EMA50", color=color.new(color.teal, 20), linewidth=2, style=plot.style_stepline)
+
+plotshape(i_show_sig and long_sig,
+          title="Long Entry",
+          style=shape.triangleup, location=location.belowbar,
+          color=color.new(color.green, 0), size=size.normal)
+
+plotshape(i_show_sig and short_sig,
+          title="Short Entry",
+          style=shape.triangledown, location=location.abovebar,
+          color=color.new(color.red, 0), size=size.normal)
+
+plotshape(i_show_exit and triple_confirm,
+          title="Triple-Confirm Exit",
+          style=shape.xcross, location=location.abovebar,
+          color=color.new(color.orange, 0), size=size.normal)
+
+// Signal label with 5m context
+if i_show_sig and (long_sig or short_sig)
+    gem_tag   = is_gem ? " ★ GEM" : ""
+    htf5_txt  = htf5_state == 1 ? "BULL" : htf5_state == -1 ? "BEAR" : "NEUT"
+    lbl_color = dir == "long" ? color.rgb(34, 139, 34) : color.rgb(220, 20, 20)
+    label.new(
+      bar_index,
+      dir == "long" ? low * 0.997 : high * 1.003,
+      text      = "Score: " + str.tostring(score) + gem_tag +
+                  "\nLev:   " + str.tostring(leverage) + "x"  +
+                  "\n5m:    " + htf5_txt                       +
+                  "\nBTC:   " + f_ctx(dir, btc_state),
+      style     = dir == "long" ? label.style_label_up : label.style_label_down,
+      color     = lbl_color,
+      textcolor = color.white,
+      size      = size.small)
+
+// Live info table — top-right
+if i_show_tbl and barstate.islast
+    t    = table.new(position.top_right, 2, 7,
+                     bgcolor=color.new(color.black, 30), border_width=1)
+    c_g  = color.new(color.green, 0)
+    c_r  = color.new(color.red,   0)
+    c_w  = color.white
+    c_gr = color.gray
+
+    table.cell(t, 0, 0, "RSI (1m)",    text_color=c_gr, text_size=size.small)
+    table.cell(t, 1, 0, str.tostring(rsi, "#.#"),
+               text_color=rsi < 30 ? c_g : rsi > 70 ? c_r : c_w, text_size=size.small)
+
+    table.cell(t, 0, 1, "Vol Ratio",   text_color=c_gr, text_size=size.small)
+    table.cell(t, 1, 1, str.tostring(vol_ratio, "#.##") + "x",
+               text_color=vol_ratio >= 5 ? c_g : c_w, text_size=size.small)
+
+    table.cell(t, 0, 2, "24h Chg",     text_color=c_gr, text_size=size.small)
+    table.cell(t, 1, 2, str.tostring(change_24h, "#.##") + "%",
+               text_color=change_24h > 0 ? c_g : c_r, text_size=size.small)
+
+    table.cell(t, 0, 3, "5m EMA50",    text_color=c_gr, text_size=size.small)
+    table.cell(t, 1, 3, htf5_state ==  1 ? "BULL" : htf5_state == -1 ? "BEAR" : "NEUT",
+               text_color=htf5_state == 1 ? c_g : htf5_state == -1 ? c_r : c_w,
+               text_size=size.small)
+
+    table.cell(t, 0, 4, "BTC 5m",      text_color=c_gr, text_size=size.small)
+    table.cell(t, 1, 4, btc_state ==   1 ? "BULL" : btc_state == -1 ? "BEAR" : "NEUT",
+               text_color=btc_state == 1 ? c_g : btc_state == -1 ? c_r : c_w,
+               text_size=size.small)
+
+    table.cell(t, 0, 5, "5m Filter",   text_color=c_gr, text_size=size.small)
+    table.cell(t, 1, 5, i_htf_filter ? "ON" : "OFF",
+               text_color=i_htf_filter ? c_g : c_gr, text_size=size.small)
+
+    table.cell(t, 0, 6, "Score",       text_color=c_gr, text_size=size.small)
+    table.cell(t, 1, 6, str.tostring(score) + (is_gem ? " ★" : ""),
+               text_color=score >= 80 ? c_gold : score >= 60 ? c_g : c_w,
+               text_size=size.small)
