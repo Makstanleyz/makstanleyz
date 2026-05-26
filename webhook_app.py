@@ -112,87 +112,113 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>MakStanleyz Scalping Bot</title>
+<title>MakStanleyz — Live Dashboard</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#0a0a0a;color:#e0e0e0;font-family:'Courier New',monospace;font-size:13px}
-.hdr{padding:14px 24px;border-bottom:1px solid #1a1a1a;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.hdr h1{color:#00e5ff;font-size:1.15rem;flex:1;letter-spacing:.5px}
+:root{--bg0:#041523;--bg1:#06253d;--bg2:#083050;--bd:rgba(41,171,226,0.22);--b:#29ABE2;--g:#00E5A0;--r:#FF4757;--y:#FFD700;--txt:#ffffff;--txt2:rgba(255,255,255,0.6);--txt3:rgba(255,255,255,0.35)}
+body{background:var(--bg0);color:var(--txt);font-family:'Courier New',Consolas,monospace;font-size:13px;min-height:100vh}
+/* scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:rgba(41,171,226,0.05)}
+::-webkit-scrollbar-thumb{background:rgba(41,171,226,0.35);border-radius:3px}
+/* header */
+.hdr{background:linear-gradient(90deg,#052236,#093460);border-bottom:1px solid var(--bd);padding:14px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:0 3px 16px rgba(4,21,35,0.7)}
+.hdr h1{color:#fff;font-size:1.18rem;flex:1;letter-spacing:1px;text-shadow:0 0 20px rgba(41,171,226,0.6)}
+.hdr h1 span{background:linear-gradient(90deg,#29ABE2,#00E5A0);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .hdr-meta{display:flex;gap:10px;align-items:center;font-size:.75rem;flex-wrap:wrap}
-.tabs{display:flex;border-bottom:2px solid #1a1a1a;padding:0 20px;overflow-x:auto}
-.tab{background:none;border:none;color:#555;padding:11px 18px;cursor:pointer;font-family:inherit;font-size:.78rem;letter-spacing:.5px;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:color .15s}
-.tab:hover{color:#aaa}
-.tab.active{color:#00e5ff;border-bottom-color:#00e5ff}
-.panel{display:none;padding:18px 20px}
+/* tabs */
+.tabs{display:flex;border-bottom:2px solid var(--bd);padding:0 20px;overflow-x:auto;background:var(--bg1)}
+.tab{background:none;border:none;color:var(--txt3);padding:12px 20px;cursor:pointer;font-family:inherit;font-size:.8rem;letter-spacing:.6px;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all .15s;font-weight:700}
+.tab:hover{color:var(--txt2)}
+.tab.active{color:var(--b);border-bottom-color:var(--b)}
+/* panels */
+.panel{display:none;padding:20px 22px}
 .panel.active{display:block}
-.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:16px}
-.card{background:#111;border:1px solid #1e1e1e;border-radius:6px;padding:14px}
-.card-title{color:#444;font-size:.68rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:7px;border-bottom:1px solid #1e1e1e}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px;margin-bottom:18px}
+/* cards */
+.card{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:16px;box-shadow:0 2px 12px rgba(4,21,35,0.4)}
+.card-title{color:rgba(41,171,226,0.8);font-size:.7rem;text-transform:uppercase;letter-spacing:1.4px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--bd);font-weight:700}
+/* table */
 table{width:100%;border-collapse:collapse}
-th,td{padding:6px 8px;text-align:left;border-bottom:1px solid #161616;white-space:nowrap}
-th{color:#444;font-weight:normal;font-size:.7rem}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid rgba(41,171,226,0.09);white-space:nowrap}
+th{color:rgba(41,171,226,0.6);font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.8px}
 tr:last-child td{border-bottom:none}
-tfoot td{border-top:1px solid #2a2a2a;border-bottom:none}
-.g{color:#00e676}.r{color:#ff5252}.b{color:#40c4ff}.y{color:#ffd740}.gr{color:#444}
-.badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:.68rem;font-weight:bold}
-.bg{background:#00e67618;color:#00e676;border:1px solid #00e676}
-.br{background:#ff525218;color:#ff5252;border:1px solid #ff5252}
-.bb{background:#40c4ff18;color:#40c4ff;border:1px solid #40c4ff}
-.bgr{background:#22222233;color:#555;border:1px solid #333}
-.by{background:#ffd74018;color:#ffd740;border:1px solid #ffd740}
-.scan-bar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
-.btn{background:#00e5ff12;color:#00e5ff;border:1px solid #00e5ff33;padding:6px 14px;border-radius:4px;cursor:pointer;font-family:inherit;font-size:.78rem}
-.btn:hover{background:#00e5ff22}
-.btn:disabled{opacity:.35;cursor:not-allowed}
-.scan-info{color:#444;font-size:.74rem}
+tr:hover td{background:rgba(41,171,226,0.04)}
+tfoot td{border-top:1px solid var(--bd);border-bottom:none}
+/* colour tokens */
+.g{color:var(--g)}.r{color:var(--r)}.b{color:var(--b)}.y{color:var(--y)}.gr{color:var(--txt3)}
+/* badges */
+.badge{display:inline-block;padding:3px 9px;border-radius:5px;font-size:.7rem;font-weight:800;letter-spacing:.4px}
+.bg{background:rgba(0,229,160,0.18);color:#00E5A0;border:1px solid rgba(0,229,160,0.4)}
+.br{background:rgba(255,71,87,0.18);color:#FF4757;border:1px solid rgba(255,71,87,0.4)}
+.bb{background:rgba(41,171,226,0.18);color:#29ABE2;border:1px solid rgba(41,171,226,0.4)}
+.bgr{background:rgba(255,255,255,0.06);color:var(--txt3);border:1px solid rgba(255,255,255,0.12)}
+.by{background:rgba(255,215,0,0.15);color:#FFD700;border:1px solid rgba(255,215,0,0.35)}
+/* scan bar */
+.scan-bar{display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.btn{background:var(--b);color:#ffffff;border:none;padding:9px 20px;border-radius:7px;cursor:pointer;font-family:inherit;font-size:.82rem;font-weight:800;letter-spacing:.5px;box-shadow:0 2px 10px rgba(41,171,226,0.45);transition:all .15s}
+.btn:hover{filter:brightness(1.12);transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn:disabled{opacity:.38;cursor:not-allowed;box-shadow:none;transform:none}
+.btn-danger{background:var(--r);box-shadow:0 2px 10px rgba(255,71,87,0.45)}
+.scan-info{color:var(--txt2);font-size:.76rem}
 .spin{display:inline-block;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-#cd{color:#40c4ff;font-size:.74rem}
+/* countdown */
+#cd{color:var(--b);font-size:.76rem;background:rgba(41,171,226,0.1);padding:3px 10px;border-radius:5px;border:1px solid var(--bd)}
+/* empty state */
+.empty{padding:28px;text-align:center;color:var(--txt3);font-size:.9rem}
+.empty-icon{font-size:2rem;margin-bottom:8px}
+/* position card */
+.pos-card{background:rgba(41,171,226,0.06);border:1px solid var(--bd);border-radius:8px;padding:14px;margin-bottom:12px}
+.pos-card table th{color:var(--txt3)}
 </style>
 </head>
 <body>
+
 <div class="hdr">
-  <h1>&#9889; MakStanleyz Scalping Bot — 1m+5m</h1>
+  <h1>🌊 <span>MakStanleyz</span> — Live Scalping Dashboard</h1>
   <div class="hdr-meta">
     <span id="hdr-mode"></span>
     <span id="hdr-trade"></span>
-    <span id="hdr-pos" class="gr"></span>
-    <span id="cd">&#8635; 60s</span>
+    <span id="hdr-pos"></span>
+    <span id="cd">↻ 60s</span>
   </div>
 </div>
+
 <div class="tabs">
-  <button class="tab active" onclick="openTab('scanner',this)">Live Scanner</button>
-  <button class="tab" onclick="openTab('longs',this)">Longs</button>
-  <button class="tab" onclick="openTab('shorts',this)">Shorts</button>
-  <button class="tab" onclick="openTab('dca',this)">Positions</button>
+  <button class="tab active" onclick="openTab('scanner',this)">📡 Live Scanner</button>
+  <button class="tab" onclick="openTab('longs',this)">📈 Longs</button>
+  <button class="tab" onclick="openTab('shorts',this)">📉 Shorts</button>
+  <button class="tab" onclick="openTab('dca',this)">💼 Positions</button>
 </div>
 
 <div id="panel-scanner" class="panel active">
   <div class="row">
     <div class="card">
-      <div class="card-title">Market Context</div>
+      <div class="card-title">📊 Market Context</div>
       <table><tbody id="mkt-tbl"><tr><td class="gr">Loading…</td></tr></tbody></table>
     </div>
     <div class="card">
-      <div class="card-title">Bot Status</div>
+      <div class="card-title">🤖 Bot Status</div>
       <table><tbody id="bot-tbl"><tr><td class="gr">Loading…</td></tr></tbody></table>
     </div>
     <div class="card">
-      <div class="card-title">Risk</div>
+      <div class="card-title">🛡️ Risk Monitor</div>
       <table><tbody id="risk-tbl"><tr><td class="gr">Loading…</td></tr></tbody></table>
     </div>
   </div>
   <div class="card">
-    <div class="card-title">Signals — 1m+5m filter</div>
+    <div class="card-title">⚡ Signals — 1m Entry · 5m Trend Filter</div>
     <div class="scan-bar">
-      <button id="scan-btn" class="btn" onclick="triggerScan()">&#9654; Scan Now</button>
+      <button id="scan-btn" class="btn" onclick="triggerScan()">▶ Scan Now</button>
       <span id="scan-status" class="scan-info">Not yet scanned</span>
     </div>
     <div style="overflow-x:auto">
       <table>
-        <thead><tr><th>Symbol</th><th>Dir</th><th>Score</th><th>RSI</th><th>Vol×</th><th>24h%</th><th>Fund%</th><th>Gem</th></tr></thead>
-        <tbody id="scanner-tbody"><tr><td colspan="8" class="gr" style="padding:18px;text-align:center">Click "Scan Now"</td></tr></tbody>
+        <thead><tr><th>Symbol</th><th>Direction</th><th>Score</th><th>RSI</th><th>Vol×</th><th>24h %</th><th>Fund %</th><th>Gem</th></tr></thead>
+        <tbody id="scanner-tbody"><tr><td colspan="8"><div class="empty"><div class="empty-icon">📡</div>Click Scan Now to detect signals</div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -200,11 +226,11 @@ tfoot td{border-top:1px solid #2a2a2a;border-bottom:none}
 
 <div id="panel-longs" class="panel">
   <div class="card">
-    <div class="card-title">Long Signals</div>
+    <div class="card-title">📈 Long Signals</div>
     <div style="overflow-x:auto">
       <table>
-        <thead><tr><th>Symbol</th><th>Score</th><th>RSI</th><th>Vol×</th><th>24h%</th><th>Fund%</th><th>Gem</th></tr></thead>
-        <tbody id="longs-tbody"></tbody>
+        <thead><tr><th>Symbol</th><th>Score</th><th>RSI</th><th>Vol×</th><th>24h %</th><th>Fund %</th><th>Gem</th></tr></thead>
+        <tbody id="longs-tbody"><tr><td colspan="7"><div class="empty"><div class="empty-icon">📈</div>No long signals yet</div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -212,11 +238,11 @@ tfoot td{border-top:1px solid #2a2a2a;border-bottom:none}
 
 <div id="panel-shorts" class="panel">
   <div class="card">
-    <div class="card-title">Short Signals</div>
+    <div class="card-title">📉 Short Signals</div>
     <div style="overflow-x:auto">
       <table>
-        <thead><tr><th>Symbol</th><th>Score</th><th>RSI</th><th>Vol×</th><th>24h%</th><th>Fund%</th><th>Gem</th></tr></thead>
-        <tbody id="shorts-tbody"></tbody>
+        <thead><tr><th>Symbol</th><th>Score</th><th>RSI</th><th>Vol×</th><th>24h %</th><th>Fund %</th><th>Gem</th></tr></thead>
+        <tbody id="shorts-tbody"><tr><td colspan="7"><div class="empty"><div class="empty-icon">📉</div>No short signals yet</div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -224,22 +250,22 @@ tfoot td{border-top:1px solid #2a2a2a;border-bottom:none}
 
 <div id="panel-dca" class="panel">
   <div class="card">
-    <div class="card-title">Open Positions</div>
-    <div id="pos-content"><p class="gr">No open positions</p></div>
+    <div class="card-title">💼 Open Positions</div>
+    <div id="pos-content"><div class="empty"><div class="empty-icon">💤</div>No open positions</div></div>
   </div>
 </div>
 
 <script>
-let _countdown = 60;
+let _countdown=60;
 function openTab(n,b){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.getElementById('panel-'+n).classList.add('active');b.classList.add('active');}
 function bdg(t,c){return`<span class="badge ${c}">${t}</span>`;}
-function sigRow(s,d){const sym=s.symbol.replace('/USDT:USDT','');const dir=s.direction==='long'?bdg('LONG','bg'):bdg('SHORT','br');const gem=s.is_gem?'<span class="y">&#9733;</span>':'<span class="gr">—</span>';const cc=s.change_24h>=0?'g':'r';const fp=(s.fund_rate*100).toFixed(4);const fc=s.fund_rate<-0.00001?'g':s.fund_rate>0.00001?'r':'gr';const rc=s.rsi<30?'g':s.rsi>70?'r':'';if(d)return`<tr><td class="b">${sym}</td><td>${dir}</td><td>${s.score}</td><td class="${rc}">${s.rsi}</td><td>${s.vol_ratio}×</td><td class="${cc}">${s.change_24h}%</td><td class="${fc}">${fp}%</td><td>${gem}</td></tr>`;return`<tr><td class="b">${sym}</td><td>${s.score}</td><td class="${rc}">${s.rsi}</td><td>${s.vol_ratio}×</td><td class="${cc}">${s.change_24h}%</td><td class="${fc}">${fp}%</td><td>${gem}</td></tr>`;}
-function renderScan(data){const sigs=data.signals||[];const age=data.age_secs!=null?`${data.age_secs}s ago`:'never';document.getElementById('scan-status').innerHTML=data.running?'<span class="spin">&#9696;</span>&nbsp;Scanning…':sigs.length?`${sigs.length} signals | last ${age}`:`Last: ${age} — no signals`;document.getElementById('scan-btn').disabled=data.running;document.getElementById('scanner-tbody').innerHTML=sigs.length?sigs.map(s=>sigRow(s,true)).join(''):'<tr><td colspan="8" class="gr" style="padding:18px;text-align:center">No signals above min score</td></tr>';document.getElementById('longs-tbody').innerHTML=sigs.filter(s=>s.direction==='long').map(s=>sigRow(s,false)).join('');document.getElementById('shorts-tbody').innerHTML=sigs.filter(s=>s.direction==='short').map(s=>sigRow(s,false)).join('');}
-function renderContext(m){const gb=(m.allow_long||m.allow_short)?bdg('OPEN','bg'):bdg('BLOCKED','br');document.getElementById('mkt-tbl').innerHTML=`<tr><th>BTC Trend</th><td>${m.btc_trend.toUpperCase()}</td></tr><tr><th>ADX</th><td class="${m.btc_adx>25?'r':'g'}">${m.btc_adx.toFixed(1)}</td></tr><tr><th>Breadth</th><td>${m.breadth_pct.toFixed(0)}% above EMA50</td></tr><tr><th>Gate</th><td>${gb}</td></tr><tr><th>Lev Cap</th><td class="y">${m.leverage_cap}×</td></tr>`;}
-function renderStatus(data){const r=data.risk;document.getElementById('risk-tbl').innerHTML=`<tr><th>Daily P&L</th><td class="${r.daily_pnl>=0?'g':'r'}">$${r.daily_pnl.toFixed(2)}</td></tr><tr><th>Daily Loss</th><td class="${r.daily_loss>0?'r':'gr'}">$${r.daily_loss.toFixed(2)}</td></tr><tr><th>Limit</th><td>$${r.daily_limit.toFixed(2)}</td></tr><tr><th>Remaining</th><td class="${r.remaining_risk>5?'g':'r'}">$${r.remaining_risk.toFixed(2)}</td></tr><tr><th>Trades</th><td>${r.trades_today}</td></tr>`;const positions=data.positions||[];document.getElementById('pos-content').innerHTML=positions.length?positions.map(p=>`<div style="margin-bottom:12px"><table><tr><th>Symbol</th><td class="b">${p.symbol}</td></tr><tr><th>Dir</th><td>${p.direction==='long'?bdg('LONG','bg'):bdg('SHORT','br')}</td></tr><tr><th>Leverage</th><td class="y">${p.leverage}×</td></tr><tr><th>Avg Entry</th><td>$${p.avg_entry.toFixed(4)}</td></tr><tr><th>Trail Stop</th><td class="r">$${p.trail_stop.toFixed(4)}</td></tr></table></div>`).join(''):'<p class="gr">No open positions</p>';}
-function renderHealth(data){const mc=data.mode==='live'?'br':'bb';document.getElementById('hdr-mode').innerHTML=bdg(data.mode.toUpperCase(),mc);document.getElementById('hdr-trade').innerHTML=data.halted?bdg('HALTED','br'):bdg('ACTIVE','bg');document.getElementById('hdr-pos').textContent=data.position_count?`🔴 ${data.position_count} open`:'';const up=data.uptime_s;document.getElementById('bot-tbl').innerHTML=`<tr><th>Mode</th><td>${bdg(data.mode.toUpperCase(),mc)}</td></tr><tr><th>Trading</th><td>${data.halted?bdg('HALTED','br'):bdg('ACTIVE','bg')}</td></tr><tr><th>Positions</th><td class="${data.position_count?'b':'gr'}">${data.position_count}/${data.max_positions||3}</td></tr><tr><th>Daily P&L</th><td class="${data.daily_pnl>=0?'g':'r'}">$${data.daily_pnl.toFixed(2)}</td></tr><tr><th>Uptime</th><td class="gr">${Math.floor(up/3600)}h ${Math.floor(up%3600/60)}m</td></tr>`;}
+function sigRow(s,d){const sym=s.symbol.replace('/USDT:USDT','');const dir=s.direction==='long'?bdg('LONG','bg'):bdg('SHORT','br');const gem=s.is_gem?'<span class="y">★</span>':'<span class="gr">—</span>';const cc=s.change_24h>=0?'g':'r';const fp=(s.fund_rate*100).toFixed(4);const fc=s.fund_rate<-0.00001?'g':s.fund_rate>0.00001?'r':'gr';const rc=s.rsi<30?'g':s.rsi>70?'r':'';if(d)return`<tr><td class="b" style="font-weight:700">${sym}</td><td>${dir}</td><td style="font-weight:700">${s.score}</td><td class="${rc}">${s.rsi}</td><td>${s.vol_ratio}×</td><td class="${cc}">${s.change_24h}%</td><td class="${fc}">${fp}%</td><td>${gem}</td></tr>`;return`<tr><td class="b" style="font-weight:700">${sym}</td><td style="font-weight:700">${s.score}</td><td class="${rc}">${s.rsi}</td><td>${s.vol_ratio}×</td><td class="${cc}">${s.change_24h}%</td><td class="${fc}">${fp}%</td><td>${gem}</td></tr>`;}
+function renderScan(data){const sigs=data.signals||[];const age=data.age_secs!=null?`${data.age_secs}s ago`:'never';document.getElementById('scan-status').innerHTML=data.running?'<span class="spin">⟳</span>&nbsp;Scanning markets…':sigs.length?`<span class="g">✓</span> ${sigs.length} signals found · last ${age}`:`Last scan: ${age} — no signals`;document.getElementById('scan-btn').disabled=data.running;document.getElementById('scanner-tbody').innerHTML=sigs.length?sigs.map(s=>sigRow(s,true)).join(''):'<tr><td colspan="8"><div class="empty"><div class="empty-icon">🔍</div>No signals above min score (80)</div></td></tr>';const longs=sigs.filter(s=>s.direction==='long');const shorts=sigs.filter(s=>s.direction==='short');document.getElementById('longs-tbody').innerHTML=longs.length?longs.map(s=>sigRow(s,false)).join(''):'<tr><td colspan="7"><div class="empty"><div class="empty-icon">📈</div>No long signals</div></td></tr>';document.getElementById('shorts-tbody').innerHTML=shorts.length?shorts.map(s=>sigRow(s,false)).join(''):'<tr><td colspan="7"><div class="empty"><div class="empty-icon">📉</div>No short signals</div></td></tr>';}
+function renderContext(m){const gb=(m.allow_long||m.allow_short)?bdg('OPEN','bg'):bdg('BLOCKED','br');document.getElementById('mkt-tbl').innerHTML=`<tr><th>BTC Trend</th><td class="b">${m.btc_trend.toUpperCase()}</td></tr><tr><th>ADX</th><td class="${m.btc_adx>25?'r':'g'}">${m.btc_adx.toFixed(1)}</td></tr><tr><th>Breadth</th><td>${m.breadth_pct.toFixed(0)}% above EMA50</td></tr><tr><th>Gate</th><td>${gb}</td></tr><tr><th>Leverage Cap</th><td class="y">${m.leverage_cap}×</td></tr>`;}
+function renderStatus(data){const r=data.risk;document.getElementById('risk-tbl').innerHTML=`<tr><th>Daily P&L</th><td class="${r.daily_pnl>=0?'g':'r'}" style="font-weight:700">$${r.daily_pnl.toFixed(2)}</td></tr><tr><th>Daily Loss</th><td class="${r.daily_loss>0?'r':'gr'}">$${r.daily_loss.toFixed(2)}</td></tr><tr><th>Limit</th><td>$${r.daily_limit.toFixed(2)}</td></tr><tr><th>Remaining</th><td class="${r.remaining_risk>5?'g':'r'}" style="font-weight:700">$${r.remaining_risk.toFixed(2)}</td></tr><tr><th>Trades Today</th><td>${r.trades_today}</td></tr>`;const positions=data.positions||[];document.getElementById('pos-content').innerHTML=positions.length?positions.map(p=>`<div class="pos-card"><table><tr><th>Symbol</th><td class="b" style="font-weight:700">${p.symbol}</td></tr><tr><th>Direction</th><td>${p.direction==='long'?bdg('LONG','bg'):bdg('SHORT','br')}</td></tr><tr><th>Leverage</th><td class="y">${p.leverage}×</td></tr><tr><th>Avg Entry</th><td>$${p.avg_entry.toFixed(4)}</td></tr><tr><th>Trail Stop</th><td class="r">$${p.trail_stop.toFixed(4)}</td></tr></table></div>`).join(''):'<div class="empty"><div class="empty-icon">💤</div>No open positions</div>';}
+function renderHealth(data){const mc=data.mode==='live'?'br':'bb';document.getElementById('hdr-mode').innerHTML=bdg(data.mode.toUpperCase(),mc);document.getElementById('hdr-trade').innerHTML=data.halted?bdg('HALTED','br'):bdg('ACTIVE','bg');document.getElementById('hdr-pos').textContent=data.position_count?`🔴 ${data.position_count} open`:'';const up=data.uptime_s;document.getElementById('bot-tbl').innerHTML=`<tr><th>Mode</th><td>${bdg(data.mode.toUpperCase(),mc)}</td></tr><tr><th>Trading</th><td>${data.halted?bdg('HALTED','br'):bdg('ACTIVE','bg')}</td></tr><tr><th>Positions</th><td class="${data.position_count?'b':'gr'}">${data.position_count}/${data.max_positions||1}</td></tr><tr><th>Daily P&L</th><td class="${data.daily_pnl>=0?'g':'r'}" style="font-weight:700">$${data.daily_pnl.toFixed(2)}</td></tr><tr><th>Uptime</th><td class="gr">${Math.floor(up/3600)}h ${Math.floor(up%3600/60)}m</td></tr>`;}
 async function loadAll(){try{const[hR,cR,sR,scR]=await Promise.all([fetch('/health'),fetch('/context'),fetch('/status'),fetch('/scan')]);renderHealth(await hR.json());renderContext(await cR.json());renderStatus(await sR.json());renderScan(await scR.json());}catch(e){console.error(e);}}
-async function triggerScan(){document.getElementById('scan-btn').disabled=true;document.getElementById('scan-status').innerHTML='<span class="spin">&#9696;</span>&nbsp;Scan triggered…';await fetch('/scan',{method:'POST'});setTimeout(loadAll,3000);}
+async function triggerScan(){document.getElementById('scan-btn').disabled=true;document.getElementById('scan-status').innerHTML='<span class="spin">⟳</span>&nbsp;Scan triggered…';await fetch('/scan',{method:'POST'});setTimeout(loadAll,3000);}
 setInterval(()=>{_countdown--;document.getElementById('cd').textContent=`↻ ${_countdown}s`;if(_countdown<=0){_countdown=60;loadAll();}},1000);
 loadAll();
 </script>
