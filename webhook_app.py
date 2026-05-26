@@ -116,7 +116,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--bg0:#76C5E0;--bg1:#168AAD;--bg2:#F8F9FA;--bd:rgba(22,138,173,0.2);--b:#168AAD;--g:#1A9E6A;--r:#E76F51;--y:#C96A10;--txt:#1B3A4B;--txt2:#4A7A8A;--txt3:#8BA8B5}
+:root{--bg0:#76C5E0;--bg1:#168AAD;--bg2:#E9ECEF;--bd:rgba(22,138,173,0.2);--b:#168AAD;--g:#1A9E6A;--r:#E76F51;--y:#C96A10;--txt:#1B3A4B;--txt2:#4A7A8A;--txt3:#8BA8B5}
 body{background:var(--bg0);color:var(--txt);font-family:'Courier New',Consolas,monospace;font-size:13px;font-weight:600;min-height:100vh}
 /* scrollbar */
 ::-webkit-scrollbar{width:5px;height:5px}
@@ -125,7 +125,7 @@ body{background:var(--bg0);color:var(--txt);font-family:'Courier New',Consolas,m
 /* header */
 .hdr{background:linear-gradient(90deg,#0D6B88,#168AAD);border-bottom:1px solid rgba(255,255,255,0.15);padding:14px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:0 3px 20px rgba(13,107,136,0.5)}
 .hdr h1{color:#fff;font-size:1.18rem;flex:1;letter-spacing:1px;text-shadow:0 0 16px rgba(0,0,0,0.3)}
-.hdr h1 span{background:linear-gradient(90deg,#F4A261,#F8F9FA);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hdr h1 span{background:linear-gradient(90deg,#F4A261,#E9ECEF);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .hdr-meta{display:flex;gap:10px;align-items:center;font-size:.75rem;flex-wrap:wrap}
 /* tabs */
 .tabs{display:flex;border-bottom:2px solid rgba(255,255,255,0.15);padding:0 20px;overflow-x:auto;background:#0F7898}
@@ -137,7 +137,7 @@ body{background:var(--bg0);color:var(--txt);font-family:'Courier New',Consolas,m
 .panel.active{display:block}
 .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px;margin-bottom:18px}
 /* cards */
-.card{background:rgba(248,249,250,0.4);backdrop-filter:blur(6px);border:1px solid rgba(22,138,173,0.22);border-radius:10px;padding:16px;box-shadow:0 4px 20px rgba(13,107,136,0.18)}
+.card{background:rgba(233,236,239,0.4);backdrop-filter:blur(6px);border:1px solid rgba(22,138,173,0.22);border-radius:10px;padding:16px;box-shadow:0 4px 20px rgba(13,107,136,0.18)}
 .card-title{color:#168AAD;font-size:.7rem;text-transform:uppercase;letter-spacing:1.4px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(22,138,173,0.15);font-weight:700}
 /* table */
 table{width:100%;border-collapse:collapse}
