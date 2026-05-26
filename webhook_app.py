@@ -137,7 +137,7 @@ body{background:var(--bg0);color:var(--txt);font-family:'Courier New',Consolas,m
 .panel.active{display:block}
 .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px;margin-bottom:18px}
 /* cards */
-.card{background:rgba(233,236,239,0.4);backdrop-filter:blur(6px);border:1px solid rgba(22,138,173,0.22);border-radius:10px;padding:16px;box-shadow:0 4px 20px rgba(13,107,136,0.18)}
+.card{background:#E9ECEF;border:1px solid rgba(22,138,173,0.22);border-radius:10px;padding:16px;box-shadow:0 4px 20px rgba(13,107,136,0.18)}
 .card-title{color:#168AAD;font-size:.7rem;text-transform:uppercase;letter-spacing:1.4px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(22,138,173,0.15);font-weight:700}
 /* table */
 table{width:100%;border-collapse:collapse}
