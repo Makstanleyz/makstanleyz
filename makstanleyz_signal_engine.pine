@@ -29,7 +29,7 @@ i_cooldown    = input.int(3,     "Min Bars Between Signals",                    
 
 // 5m trend filter — block entries that strongly oppose the 5m trend
 i_htf_filter  = input.bool(true, "Apply 5m Trend Filter (block counter-trend entries)", group="5m Filter")
-i_htf_band    = input.float(0.8, "5m EMA Band % (neutral zone)",                     group="5m Filter")
+i_htf_band    = input.float(2.0, "5m EMA Band % (neutral zone)",                     group="5m Filter")
 
 i_rsi_hold_l  = input.int(70,    "RSI Exit Level (Long position)",                    group="Exit Engine")
 i_rsi_hold_s  = input.int(30,    "RSI Exit Level (Short position)",                   group="Exit Engine")

@@ -19,13 +19,13 @@ TG_TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN")
 TG_CHAT_ID  = os.getenv("TELEGRAM_CHAT_ID")
 
 # ── Capital management ────────────────────────────────────────
-MAX_POSITIONS     = 3       # simultaneous open positions
-TOTAL_ALLOCATION  = 300.0   # USDT — total capital (3 slots × $100)
-_PER_SLOT         = TOTAL_ALLOCATION / MAX_POSITIONS   # $100 per slot
+MAX_POSITIONS     = 1       # 1 position at a time — full capital focus
+TOTAL_ALLOCATION  = 300.0   # USDT — total capital (1 slot × $300)
+_PER_SLOT         = TOTAL_ALLOCATION / MAX_POSITIONS   # $300 per slot
 RESERVE_PCT       = 0.50    # 50% of each slot held as reserve
-ACTIVE_MARGIN     = _PER_SLOT * (1 - RESERVE_PCT)     # $50 per position
-RESERVE_MARGIN    = _PER_SLOT * RESERVE_PCT            # $50 per position
-INJECT_TRANCHE    = RESERVE_MARGIN * 0.25              # $12.50 per injection
+ACTIVE_MARGIN     = _PER_SLOT * (1 - RESERVE_PCT)     # $150 per position
+RESERVE_MARGIN    = _PER_SLOT * RESERVE_PCT            # $150 per position
+INJECT_TRANCHE    = RESERVE_MARGIN * 0.25              # $37.50 per injection
 MAX_INJECTIONS    = 2       # maximum reserve injections per trade
 
 # ── DCA ladder ───────────────────────────────────────────────
@@ -35,7 +35,7 @@ DCA_STEP_PCT      = 0.8     # % between each DCA level (tight for 1m scalping)
 # ── Signal thresholds ────────────────────────────────────────
 RSI_OVERSOLD      = 20      # extreme oversold level for SETUP bar
 RSI_OVERBOUGHT    = 80      # extreme overbought level for SETUP bar
-VOL_SPIKE_MULT    = 5.0     # spike bar must be ≥5× avg vol (calibrated for 1m candles)
+VOL_SPIKE_MULT    = 4.0     # spike bar must be ≥4× avg vol (optimised: higher win rate vs 5.0)
 MIN_SCORE         = 80      # only high-conviction setups
 GAINER_THRESHOLD  = 10.0   # 24h % gain for top gainer short
 LOSER_THRESHOLD   = -10.0  # 24h % loss for top loser long
@@ -50,18 +50,18 @@ HTF_EMA           = 50      # 5m EMA for HTF bias
 EXIT_CONFIRM_BARS = 1       # 1 bar confirm — 1m scalping
 
 # ── Scalp profit targets ──────────────────────────────────────
-TAKE_PROFIT_PCT   = 4.0    # arm tight trail when profit hits 4%
-MAX_PROFIT_PCT    = 4.0    # hard exit at 4% — capture the scalp
+TAKE_PROFIT_PCT   = 2.0    # arm tight trail when profit hits 2% (optimised for micro trading)
+MAX_PROFIT_PCT    = 2.0    # hard exit at 2% — fast scalp capture
 STOP_LOSS_PCT     = 1.5    # hard stop loss from initial entry
 WITHDRAW_AT_PCT   = 4.0    # reclaim injected reserve at +4% profit
 
 # ── Trail stop — tightens once in the profit zone ────────────
 TRAIL_STEPS = [
-    (2.0, 1.5),   # below 2% profit → 1.5% trail
-    (4.0, 1.0),   # 2–4% → 1.0% trail (locks in ≥1% once 2% hit)
-    (999, 0.5),   # above 4% → 0.5% trail (ride any extra)
+    (1.0, 0.8),   # below 1% profit → 0.8% trail
+    (2.0, 0.5),   # 1–2% → 0.5% trail (locks in profit once 1% hit)
+    (999, 0.3),   # above 2% → 0.3% trail (ride any extra past TP)
 ]
-TRAIL_PCT         = 2.0    # initial trail before any profit
+TRAIL_PCT         = 1.5    # initial trail before any profit
 
 # ── Cushion fund (margin dilution buffer) ────────────────────
 CUSHION_PCT          = 0.20    # 20% of per-slot capital = $20

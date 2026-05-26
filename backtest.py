@@ -40,6 +40,16 @@ TF_PARAMS = {
         "max_profit_pct":      4.0,
         "cushion_recovery_tp": 2.0,
     },
+    "3m": {
+        "bars_per_day":        480,
+        "tf_ms":               3 * 60 * 1000,
+        "dca_step_pct":        1.0,
+        "stop_loss_pct":       1.8,
+        "trail_pct":           2.5,
+        "trail_steps":         [(3.0, 2.0), (6.0, 1.0), (999, 0.5)],
+        "max_profit_pct":      6.0,
+        "cushion_recovery_tp": 2.5,
+    },
     "5m": {
         "bars_per_day":        288,
         "tf_ms":               5 * 60 * 1000,
@@ -65,7 +75,7 @@ TF_PARAMS = {
 # ── CLI args ──────────────────────────────────────────────────────────────────
 parser = argparse.ArgumentParser()
 parser.add_argument("--timeframe",      default="1m",
-                    choices=["all", "1m", "5m", "15m"],
+                    choices=["all", "1m", "3m", "5m", "15m"],
                     help="Timeframe (default: 1m)")
 parser.add_argument("--days",           type=int, default=30,
                     help="Lookback days (default: 30 — use ≤30 for 1m)")
@@ -80,25 +90,38 @@ parser.add_argument("--vol-spike",      type=float, default=None, dest="vol_spik
                     help="Override VOL_SPIKE_MULT (default: from config, 7.0)")
 parser.add_argument("--min-score",      type=int,   default=None, dest="min_score",
                     help="Override MIN_SCORE (default: from config, 80)")
+parser.add_argument("--rsi-os",         type=int,   default=None, dest="rsi_os",
+                    help="Override RSI_OVERSOLD (default: 20)")
+parser.add_argument("--rsi-ob",         type=int,   default=None, dest="rsi_ob",
+                    help="Override RSI_OVERBOUGHT (default: 80)")
 parser.add_argument("--same-bar-cap",   dest="same_bar_cap",
                     action=argparse.BooleanOptionalAction, default=True)
 parser.add_argument("--btc-guard",      dest="btc_guard",
                     action=argparse.BooleanOptionalAction, default=True)
+parser.add_argument("--htf-band",       type=float, default=None, dest="htf_band",
+                    help="Override HTF neutral band % (default: 0.8). Try 1.5 or 2.0")
+parser.add_argument("--tp",             type=float, default=None, dest="tp",
+                    help="Override max_profit_pct / TAKE_PROFIT_PCT (e.g. 2.0)")
 args = parser.parse_args()
 
 LEVERAGE        = args.leverage
 HTF_FILTER_ON   = not args.no_htf_filter
+HTF_BAND        = (args.htf_band / 100.0) if args.htf_band is not None else 0.008
 
 # CLI overrides for signal params
 if args.vol_spike is not None:
     config.VOL_SPIKE_MULT = args.vol_spike
 if args.min_score is not None:
     config.MIN_SCORE = args.min_score
+if args.rsi_os is not None:
+    config.RSI_OVERSOLD = args.rsi_os
+if args.rsi_ob is not None:
+    config.RSI_OVERBOUGHT = args.rsi_ob
 TEST_SYMBOLS    = (
     [s.replace("USDT", "") + "/USDT:USDT" for s in args.symbols]
     if args.symbols else config.SCAN_PAIRS
 )
-TIMEFRAMES = ["1m", "5m", "15m"] if args.timeframe == "all" else [args.timeframe]
+TIMEFRAMES = ["1m", "3m", "5m", "15m"] if args.timeframe == "all" else [args.timeframe]
 
 PER_SLOT_CAPITAL = args.capital
 ACTIVE_MARGIN    = PER_SLOT_CAPITAL * 0.50
@@ -162,12 +185,12 @@ def calc_score(rsi: float, vol_ratio: float, change_24h: float, direction: str) 
     return min(score, 100)
 
 def htf5_state_at(closes_5m: np.ndarray, idx_5m: int) -> int:
-    """5m EMA50 vs price — 1=bull, -1=bear, 0=neutral (±0.8% band)."""
+    """5m EMA50 vs price — 1=bull, -1=bear, 0=neutral (configurable band)."""
     if idx_5m < 50:
         return 0
     ema50 = calc_ema_series(closes_5m[:idx_5m + 1], 50)[-1]
     price = closes_5m[idx_5m]
-    band  = 0.008
+    band  = HTF_BAND
     if price > ema50 * (1 + band):
         return 1
     if price < ema50 * (1 - band):
@@ -602,7 +625,9 @@ async def main():
     all_results: dict[str, list[Trade]] = {}
 
     for tf in TIMEFRAMES:
-        p       = TF_PARAMS[tf]
+        p       = dict(TF_PARAMS[tf])  # copy so overrides don't persist
+        if args.tp is not None:
+            p["max_profit_pct"] = args.tp
         tf_bars = args.days * p["bars_per_day"]
         print(f"── {tf} ({tf_bars} bars / {args.days} days) ──")
 

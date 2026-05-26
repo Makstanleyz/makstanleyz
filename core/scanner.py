@@ -113,14 +113,14 @@ class MakStanleyzScanner:
     def _htf5_state(self, df5m: pd.DataFrame) -> int:
         """
         5m trend state from EMA50 vs last close.
-        Returns 1=bull, -1=bear, 0=neutral (±0.8% band).
+        Returns 1=bull, -1=bear, 0=neutral (±2.0% band).
         """
         if df5m is None or len(df5m) < 51:
             return 0
         closes = df5m["close"].values
         ema50  = calc_ema(closes, 50)[-1]
         price  = closes[-1]
-        band   = 0.008
+        band   = 0.020
         if price > ema50 * (1 + band):
             return 1
         if price < ema50 * (1 - band):
