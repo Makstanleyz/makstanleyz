@@ -115,9 +115,9 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 <title>MakStanleyz — Live Dashboard</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
+*{box-sizing:border-box;margin:0;padding:0;font-weight:700}
 :root{--bg0:#76C5E0;--bg1:#168AAD;--bg2:#E9ECEF;--bd:rgba(22,138,173,0.2);--b:#168AAD;--g:#1A9E6A;--r:#E76F51;--y:#C96A10;--txt:#1B3A4B;--txt2:#4A7A8A;--txt3:#8BA8B5}
-body{background:var(--bg0);color:var(--txt);font-family:'Courier New',Consolas,monospace;font-size:13px;font-weight:600;min-height:100vh}
+body{background:var(--bg0);color:var(--txt);font-family:'Courier New',Consolas,monospace;font-size:13px;font-weight:700;min-height:100vh}
 /* scrollbar */
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:rgba(22,138,173,0.1)}
