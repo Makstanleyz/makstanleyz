@@ -20,7 +20,7 @@ TG_CHAT_ID  = os.getenv("TELEGRAM_CHAT_ID")
 
 # ── Capital management ────────────────────────────────────────
 MAX_POSITIONS     = 1       # 1 position at a time — full capital focus
-TOTAL_ALLOCATION  = 300.0   # USDT — total capital (1 slot × $300)
+TOTAL_ALLOCATION  = 100.0   # USDT — live trial capital (scale to $300 after validation)
 _PER_SLOT         = TOTAL_ALLOCATION / MAX_POSITIONS   # $300 per slot
 RESERVE_PCT       = 0.50    # 50% of each slot held as reserve
 ACTIVE_MARGIN     = _PER_SLOT * (1 - RESERVE_PCT)     # $150 per position
