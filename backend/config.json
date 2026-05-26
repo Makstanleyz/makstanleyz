@@ -1,0 +1,14 @@
+{
+  "api_key": "",
+  "api_secret": "",
+  "testnet": true,
+  "leverage": 5,
+  "trade_investment": 50,
+  "stop_loss_pct": 1.5,
+  "take_profit_pct": 3.0,
+  "scan_interval_sec": 4,
+  "max_open_positions": 5,
+  "signal_threshold": 65,
+  "bot_running": false,
+  "active_strategies": ["ema", "rsi", "bb", "vwap", "obf", "brk", "mom"]
+}
