@@ -110,6 +110,26 @@ class MakStanleyzScanner:
             logger.debug("fetch_funding_rate %s: %s", symbol, e)
             return 0.0
 
+    async def fetch_orderbook_imbalance(self, symbol: str, depth: int = 10) -> float:
+        """
+        Returns bid/ask volume imbalance ratio from top N order book levels.
+        > 1.0 = more bids (buying pressure)
+        < 1.0 = more asks (selling pressure)
+        Returns 1.0 (neutral) on error.
+        """
+        try:
+            ob      = await self.exchange.fetch_order_book(symbol, limit=depth * 2)
+            bids    = ob.get("bids", [])[:depth]
+            asks    = ob.get("asks", [])[:depth]
+            bid_vol = sum(qty for _, qty in bids)
+            ask_vol = sum(qty for _, qty in asks)
+            if ask_vol == 0:
+                return 1.0
+            return round(bid_vol / ask_vol, 3)
+        except Exception as e:
+            logger.debug("fetch_orderbook %s: %s", symbol, e)
+            return 1.0
+
     def _htf5_state(self, df5m: pd.DataFrame) -> int:
         """
         5m trend state from EMA50 vs last close.
@@ -155,11 +175,12 @@ class MakStanleyzScanner:
 
     async def scan_symbol(self, symbol: str,
                           forced_direction: str = "") -> Optional[Signal]:
-        df_1m, df_5m, ticker, fund_rate = await asyncio.gather(
+        df_1m, df_5m, ticker, fund_rate, ob_ratio = await asyncio.gather(
             self.fetch_ohlcv(symbol, config.TIMEFRAME),
             self.fetch_ohlcv(symbol, config.HTF_TIMEFRAME, limit=60),
             self.fetch_ticker(symbol),
             self.fetch_funding_rate(symbol),
+            self.fetch_orderbook_imbalance(symbol, depth=config.OB_DEPTH),
         )
         if df_1m is None or ticker is None:
             return None
@@ -213,7 +234,20 @@ class MakStanleyzScanner:
             if direction is None:
                 return None
 
+        # Order book depth filter — require imbalance favouring signal direction
+        if direction == "long"  and ob_ratio < config.OB_LONG_MIN:
+            return None
+        if direction == "short" and ob_ratio > config.OB_SHORT_MAX:
+            return None
+
         score = calc_score(rsi_prev, vol_prev, change_24h, direction, fund_rate)
+
+        # Order book imbalance score boost (independent signal — genuinely new info)
+        if direction == "long":
+            score += 15 if ob_ratio >= config.OB_STRONG_LONG else 8 if ob_ratio >= config.OB_MILD_LONG else 0
+        else:
+            score += 15 if ob_ratio <= config.OB_STRONG_SHORT else 8 if ob_ratio <= config.OB_MILD_SHORT else 0
+
         if score < config.MIN_SCORE:
             return None
 

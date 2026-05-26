@@ -102,6 +102,12 @@ parser.add_argument("--htf-band",       type=float, default=None, dest="htf_band
                     help="Override HTF neutral band % (default: 0.8). Try 1.5 or 2.0")
 parser.add_argument("--tp",             type=float, default=None, dest="tp",
                     help="Override max_profit_pct / TAKE_PROFIT_PCT (e.g. 2.0)")
+parser.add_argument("--macd-filter",    action="store_true", dest="macd_filter",
+                    help="Require MACD histogram turning in signal direction")
+parser.add_argument("--divergence",     action="store_true", dest="divergence",
+                    help="Require RSI divergence confirmation")
+parser.add_argument("--cvd-filter",     action="store_true", dest="cvd_filter",
+                    help="Require CVD (volume delta) alignment with signal")
 args = parser.parse_args()
 
 LEVERAGE        = args.leverage
@@ -141,6 +147,26 @@ def calc_rsi(closes: np.ndarray, period: int = 14) -> float:
         return 100.0
     return 100.0 - 100.0 / (1.0 + avg_gain / avg_loss)
 
+def calc_rsi_series(closes: np.ndarray, period: int = 14) -> np.ndarray:
+    """Vectorized RSI series — O(n) instead of O(n²)."""
+    rsi = np.full(len(closes), 50.0)
+    if len(closes) < period + 1:
+        return rsi
+    deltas = np.diff(closes)
+    gains  = np.where(deltas > 0, deltas, 0.0)
+    losses = np.where(deltas < 0, -deltas, 0.0)
+    avg_gain = gains[:period].mean()
+    avg_loss = losses[:period].mean()
+    for i in range(period, len(deltas)):
+        avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+        avg_loss = (avg_loss * (period - 1) + losses[i]) / period
+        if avg_loss == 0:
+            rsi[i + 1] = 100.0
+        else:
+            rs = avg_gain / avg_loss
+            rsi[i + 1] = 100.0 - 100.0 / (1.0 + rs)
+    return rsi
+
 def calc_vol_ratio(volumes: np.ndarray, window: int = 20) -> float:
     if len(volumes) < window + 1:
         return 1.0
@@ -166,11 +192,64 @@ def rolling_vwap(df: pd.DataFrame, window: int = 50) -> np.ndarray:
             result[i] = (hlc3.values[sl] * vol_sl).sum() / cum_vol
     return result
 
+def calc_macd_histogram(closes: np.ndarray, fast=12, slow=26, signal=9) -> np.ndarray:
+    if len(closes) < slow + signal:
+        return np.zeros(len(closes))
+    ema_fast = calc_ema_series(closes, fast)
+    ema_slow = calc_ema_series(closes, slow)
+    macd_line = ema_fast - ema_slow
+    signal_line = calc_ema_series(macd_line, signal)
+    return macd_line - signal_line
+
+def calc_cvd(opens: np.ndarray, closes: np.ndarray, highs: np.ndarray,
+             lows: np.ndarray, volumes: np.ndarray, window: int = 20) -> float:
+    """Cumulative volume delta over last N bars. Positive = buying pressure."""
+    if len(closes) < window:
+        return 0.0
+    sl = slice(-window, None)
+    o, c, h, l, v = opens[sl], closes[sl], highs[sl], lows[sl], volumes[sl]
+    ranges = np.where(h - l > 0, h - l, 1e-9)
+    buy_pct = (c - l) / ranges
+    delta   = (buy_pct * 2 - 1) * v
+    return float(delta.sum())
+
+def detect_rsi_divergence(closes: np.ndarray, rsi_series: np.ndarray,
+                          direction: str, lookback: int = 30) -> bool:
+    """
+    Bullish divergence (long): price made lower low but RSI made higher low.
+    Bearish divergence (short): price made higher high but RSI made lower high.
+    """
+    if len(closes) < lookback + 2 or len(rsi_series) < lookback + 2:
+        return False
+    c   = closes[-(lookback):]
+    r   = rsi_series[-(lookback):]
+    if direction == "long":
+        price_low_now  = c[-1]
+        price_low_prev = c[:-5].min()
+        rsi_now        = r[-1]
+        rsi_at_prev_low = r[np.argmin(c[:-5])]
+        return price_low_now < price_low_prev and rsi_now > rsi_at_prev_low + 2
+    else:
+        price_hi_now   = c[-1]
+        price_hi_prev  = c[:-5].max()
+        rsi_now        = r[-1]
+        rsi_at_prev_hi = r[np.argmax(c[:-5])]
+        return price_hi_now > price_hi_prev and rsi_now < rsi_at_prev_hi - 2
+
 def trail_pct_for(profit_pct: float, p: dict) -> float:
     for threshold, pct in p["trail_steps"]:
         if profit_pct < threshold:
             return pct
     return p["trail_steps"][-1][1]
+
+def calc_bb(closes: np.ndarray, period: int = 20, std_mult: float = 2.0):
+    """Returns (upper, mid, lower) Bollinger Bands for the last bar."""
+    if len(closes) < period:
+        return None, None, None
+    sl   = closes[-period:]
+    mid  = sl.mean()
+    std  = sl.std()
+    return mid + std_mult * std, mid, mid - std_mult * std
 
 def calc_score(rsi: float, vol_ratio: float, change_24h: float, direction: str) -> int:
     score = 0
@@ -268,10 +347,13 @@ def simulate(df: pd.DataFrame, df_5m: Optional[pd.DataFrame], symbol: str, p: di
     lows    = df["low"].values
     volumes = df["volume"].values
 
+    opens = df["open"].values
     ema5  = calc_ema_series(closes, 5)
     ema8  = calc_ema_series(closes, 8)
     ema13 = calc_ema_series(closes, 13)
     vwap  = rolling_vwap(df)
+    macd_hist  = calc_macd_histogram(closes)
+    rsi_series = calc_rsi_series(closes)
 
     # Build a 5m close array aligned to 1m bar timestamps (forward-fill)
     closes_5m  = None
@@ -460,9 +542,33 @@ def simulate(df: pd.DataFrame, df_5m: Optional[pd.DataFrame], symbol: str, p: di
             if str(df["ts"].iloc[i])[:16] in btc_declining_set:
                 continue
 
+        bb_up, _, bb_lo = calc_bb(closes[:i], 20, 2.0)
+
         score = calc_score(rsi_prev, vol_prev, change_24h, direction)
         if score < config.MIN_SCORE:
             continue
+
+        # MACD histogram filter: histogram must be turning in signal direction
+        if args.macd_filter:
+            h_now  = macd_hist[i-1]
+            h_prev = macd_hist[i-2]
+            if direction == "long"  and not (h_now > h_prev):
+                continue
+            if direction == "short" and not (h_now < h_prev):
+                continue
+
+        # RSI divergence filter
+        if args.divergence:
+            if not detect_rsi_divergence(closes[:i], rsi_series[:i], direction):
+                continue
+
+        # CVD filter: volume delta must align with expected reversal
+        if args.cvd_filter:
+            cvd = calc_cvd(opens[:i], closes[:i], highs[:i], lows[:i], volumes[:i])
+            if direction == "long"  and cvd > 0:
+                continue
+            if direction == "short" and cvd < 0:
+                continue
 
         e1 = closes[i]
         dca_prices, dca_margins, dca_contracts = [], [], []

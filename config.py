@@ -79,6 +79,15 @@ INJECT_WARN_PCT       = 10.0   # warn when liq is within 10%
 FUND_RATE_STRONG  = -0.001    # < -0.1%  → +10 score pts for longs
 FUND_RATE_MILD    = -0.0005   # < -0.05% → +5  score pts for longs
 
+# ── Order book depth filter ────────────────────────────────────
+OB_DEPTH          = 10        # top N bid/ask levels to measure
+OB_LONG_MIN       = 0.80      # min bid/ask ratio to allow long (block ask-heavy books)
+OB_SHORT_MAX      = 1.25      # max bid/ask ratio to allow short (block bid-heavy books)
+OB_STRONG_LONG    = 1.50      # ratio ≥ 1.5 → +15 score pts (strong bid wall)
+OB_MILD_LONG      = 1.20      # ratio ≥ 1.2 → +8 score pts
+OB_STRONG_SHORT   = 0.67      # ratio ≤ 0.67 → +15 score pts (strong ask wall)
+OB_MILD_SHORT     = 0.83      # ratio ≤ 0.83 → +8 score pts
+
 # ── Dynamic top-movers selection ─────────────────────────────
 TOP_MOVERS_COUNT    = 5
 TOP_MOVER_MIN_VOL   = 5_000_000
