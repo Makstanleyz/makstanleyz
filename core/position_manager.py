@@ -2,6 +2,7 @@
 position_manager.py — Live position monitor (10s tick for 1m scalping)
 """
 import logging
+import time
 import numpy as np
 import ccxt.async_support as ccxt
 from core.order_executor import ActivePosition, DCALevel
@@ -94,10 +95,20 @@ class PositionManager:
             position.direction == "short" and current_price >= position.trail_stop
         )
 
-        sl_ref = position.sl_ref_price if position.sl_ref_price > 0 else current_price
-        sl_price = (sl_ref * (1 - config.STOP_LOSS_PCT / 100)
-                    if position.direction == "long"
-                    else sl_ref * (1 + config.STOP_LOSS_PCT / 100))
+        # Structural SL takes priority; falls back to fixed % if not set
+        if config.SL_USE_STRUCTURAL and position.structural_sl > 0:
+            sl_price = position.structural_sl
+        else:
+            sl_ref   = position.sl_ref_price if position.sl_ref_price > 0 else current_price
+            sl_price = (sl_ref * (1 - config.STOP_LOSS_PCT / 100)
+                        if position.direction == "long"
+                        else sl_ref * (1 + config.STOP_LOSS_PCT / 100))
+
+        time_stop_hit = (
+            time.time() - position.open_time > config.TIME_STOP_BARS * 60
+            and profit_pct <= 0.0
+        )
+
         cushion_inject_ready = (
             position.cushion_used < config.CUSHION_TRANCHES and
             ((position.direction == "long"  and current_price <= sl_price) or
@@ -119,6 +130,7 @@ class PositionManager:
             "trail_hit":            trail_hit,
             "trail_updated":        trail_updated,
             "newly_filled":         newly_filled,
+            "time_stop_hit":        time_stop_hit,
             "inject_urgent":        liq_dist <= config.INJECT_TRIGGER_PCT,
             "inject_warn":          liq_dist <= config.INJECT_WARN_PCT,
             "withdraw_ready":       profit_pct >= config.WITHDRAW_AT_PCT and position.injections_used > 0,

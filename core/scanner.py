@@ -26,7 +26,8 @@ class Signal:
     is_gem:     bool
     is_gainer:  bool
     is_loser:   bool
-    fund_rate:  float = 0.0
+    fund_rate:      float = 0.0
+    structural_sl:  float = 0.0   # setup candle extreme + buffer
 
 
 def calc_rsi(closes: np.ndarray, period: int = 14) -> float:
@@ -234,6 +235,19 @@ class MakStanleyzScanner:
             if direction is None:
                 return None
 
+        # Structural SL: just beyond setup candle extreme, capped at SL_MAX_PCT
+        if config.SL_USE_STRUCTURAL:
+            if direction == "long":
+                raw_sl = lows[-2] * (1 - config.SL_STRUCTURAL_BUFF / 100)
+                floor  = price * (1 - config.SL_MAX_PCT / 100)
+                structural_sl = max(raw_sl, floor)
+            else:
+                raw_sl = highs[-2] * (1 + config.SL_STRUCTURAL_BUFF / 100)
+                ceil   = price * (1 + config.SL_MAX_PCT / 100)
+                structural_sl = min(raw_sl, ceil)
+        else:
+            structural_sl = 0.0
+
         # Order book depth filter — require imbalance favouring signal direction
         if direction == "long"  and ob_ratio < config.OB_LONG_MIN:
             return None
@@ -263,6 +277,7 @@ class MakStanleyzScanner:
             is_gainer=is_gainer,
             is_loser=is_loser,
             fund_rate=round(fund_rate, 6),
+            structural_sl=round(structural_sl, 6),
         )
 
     async def scan_all(self) -> list[Signal]:

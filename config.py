@@ -49,6 +49,12 @@ EMA_SLOW          = 13
 HTF_EMA           = 50      # 5m EMA for HTF bias
 EXIT_CONFIRM_BARS = 1       # 1 bar confirm — 1m scalping
 
+# ── Stop hunt mitigation ──────────────────────────────────────
+SL_USE_STRUCTURAL  = True   # anchor SL to setup candle extreme (not fixed %)
+SL_STRUCTURAL_BUFF = 0.1    # % buffer beyond setup candle extreme
+SL_MAX_PCT         = 3.0    # cap structural SL at this % from entry
+TIME_STOP_BARS     = 30     # exit if no profit after N bars (avoids ranging traps)
+
 # ── Scalp profit targets ──────────────────────────────────────
 TAKE_PROFIT_PCT   = 2.0    # arm tight trail when profit hits 2% (optimised for micro trading)
 MAX_PROFIT_PCT    = 2.0    # hard exit at 2% — fast scalp capture

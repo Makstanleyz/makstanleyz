@@ -47,6 +47,7 @@ class ActivePosition:
     recovery_tp:     bool  = False
     injections_used: int   = 0
     confirm_count:   int   = 0
+    structural_sl:   float = 0.0   # setup candle SL level
     open_time:       float = field(default_factory=time.time)
     is_open:         bool  = True
 
@@ -138,8 +139,12 @@ class OrderExecutor:
         e1.fill_price = fill_price
         e1.fill_time  = time.time()
 
-        trail_stop = (fill_price * (1 - config.TRAIL_PCT / 100) if dir == "long"
-                      else fill_price * (1 + config.TRAIL_PCT / 100))
+        struct_sl  = validated.signal.structural_sl
+        if config.SL_USE_STRUCTURAL and struct_sl > 0:
+            trail_stop = struct_sl
+        else:
+            trail_stop = (fill_price * (1 - config.TRAIL_PCT / 100) if dir == "long"
+                          else fill_price * (1 + config.TRAIL_PCT / 100))
 
         position = ActivePosition(
             symbol=sym, direction=dir, leverage=lev, validated=validated,
@@ -147,6 +152,7 @@ class OrderExecutor:
             total_contracts=e1.contracts, total_margin=e1.margin,
             dca_margin=e1.margin, peak_price=fill_price,
             trail_stop=trail_stop, sl_ref_price=fill_price,
+            structural_sl=validated.signal.structural_sl,
         )
 
         for level in levels[1:]:

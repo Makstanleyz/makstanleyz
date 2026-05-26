@@ -108,6 +108,12 @@ parser.add_argument("--divergence",     action="store_true", dest="divergence",
                     help="Require RSI divergence confirmation")
 parser.add_argument("--cvd-filter",     action="store_true", dest="cvd_filter",
                     help="Require CVD (volume delta) alignment with signal")
+parser.add_argument("--structural-sl",  dest="structural_sl",
+                    action=argparse.BooleanOptionalAction, default=True,
+                    help="Anchor SL to setup candle extreme (default: on)")
+parser.add_argument("--time-stop",      dest="time_stop",
+                    action=argparse.BooleanOptionalAction, default=True,
+                    help="Exit after N bars with no profit (default: on)")
 args = parser.parse_args()
 
 LEVERAGE        = args.leverage
@@ -302,11 +308,12 @@ class Trade:
     pnl:             float = 0.0
     pnl_pct:         float = 0.0
     hold_bars:       int   = 0
-    dca_margin:      float = 0.0
-    sl_ref_price:    float = 0.0
-    cushion_used:    int   = 0
-    cushion_margin:  float = 0.0
-    recovery_tp:     bool  = False
+    dca_margin:         float = 0.0
+    sl_ref_price:       float = 0.0
+    structural_sl_price:float = 0.0
+    cushion_used:       int   = 0
+    cushion_margin:     float = 0.0
+    recovery_tp:        bool  = False
 
 def apply_position_limit(all_trades: list[Trade], max_pos: int) -> list[Trade]:
     if max_pos <= 0:
@@ -432,24 +439,28 @@ def simulate(df: pd.DataFrame, df_5m: Optional[pd.DataFrame], symbol: str, p: di
                         )
                         active.avg_entry = filled_notional / active.total_contracts
 
-            # SL / cushion
-            sl_price = (active.sl_ref_price * (1 - p["stop_loss_pct"] / 100)
-                        if active.direction == "long"
-                        else active.sl_ref_price * (1 + p["stop_loss_pct"] / 100))
+            # SL / cushion — structural SL takes priority when available
+            if args.structural_sl and active.structural_sl_price > 0:
+                sl_price = active.structural_sl_price
+            else:
+                sl_price = (active.sl_ref_price * (1 - p["stop_loss_pct"] / 100)
+                            if active.direction == "long"
+                            else active.sl_ref_price * (1 + p["stop_loss_pct"] / 100))
             sl_hit = ((active.direction == "long"  and lows[i]  <= sl_price) or
                       (active.direction == "short" and highs[i] >= sl_price))
 
             if sl_hit and active.cushion_used < config.CUSHION_TRANCHES:
-                tranche              = CUSHION_TOTAL / config.CUSHION_TRANCHES
+                tranche               = CUSHION_TOTAL / config.CUSHION_TRANCHES
                 active.cushion_margin += tranche
-                active.total_margin  += tranche
-                active.cushion_used  += 1
-                active.recovery_tp    = True
-                active.sl_ref_price   = sl_price
-                active.peak_price     = sl_price
-                active.trail_stop     = (sl_price * (1 - p["trail_pct"] / 100)
-                                         if active.direction == "long"
-                                         else sl_price * (1 + p["trail_pct"] / 100))
+                active.total_margin   += tranche
+                active.cushion_used   += 1
+                active.recovery_tp     = True
+                active.sl_ref_price    = sl_price
+                active.structural_sl_price = 0.0   # fall back to fixed % after injection
+                active.peak_price      = sl_price
+                active.trail_stop      = (sl_price * (1 - p["trail_pct"] / 100)
+                                          if active.direction == "long"
+                                          else sl_price * (1 + p["trail_pct"] / 100))
                 sl_hit = False
 
             tp_pct       = p["cushion_recovery_tp"] if active.recovery_tp else p["max_profit_pct"]
@@ -469,14 +480,21 @@ def simulate(df: pd.DataFrame, df_5m: Optional[pd.DataFrame], symbol: str, p: di
             confirm_count = confirm_count + 1 if all_flipped else 0
             triple_confirm = confirm_count >= config.EXIT_CONFIRM_BARS
 
+            bars_in_trade  = i - active.entry_bar
+            time_stop_hit  = (args.time_stop
+                              and bars_in_trade >= config.TIME_STOP_BARS
+                              and profit_pct <= 0.0)
+
             if max_tp_hit:
                 should_exit = True; exit_price = max_tp_price; exit_reason = "TAKE_PROFIT"
             elif sl_hit:
                 should_exit = True; exit_price = sl_price;     exit_reason = "STOP_LOSS"
-            elif trail_hit or triple_confirm:
-                should_exit = True
-                exit_price  = active.trail_stop if trail_hit else price
-                exit_reason = "TRAIL_STOP" if trail_hit else "TRIPLE_CONFIRM"
+            elif trail_hit:
+                should_exit = True; exit_price = active.trail_stop; exit_reason = "TRAIL_STOP"
+            elif time_stop_hit:
+                should_exit = True; exit_price = price;         exit_reason = "TIME_STOP"
+            elif triple_confirm:
+                should_exit = True; exit_price = price;         exit_reason = "TRIPLE_CONFIRM"
             else:
                 should_exit = False; exit_price = price; exit_reason = ""
 
@@ -570,6 +588,17 @@ def simulate(df: pd.DataFrame, df_5m: Optional[pd.DataFrame], symbol: str, p: di
             if direction == "short" and cvd < 0:
                 continue
 
+        # Structural SL: below/above setup candle extreme, capped at SL_MAX_PCT
+        if args.structural_sl:
+            if direction == "long":
+                raw_sl = lows[i - 1] * (1 - config.SL_STRUCTURAL_BUFF / 100)
+                struct_sl = max(raw_sl, closes[i] * (1 - config.SL_MAX_PCT / 100))
+            else:
+                raw_sl = highs[i - 1] * (1 + config.SL_STRUCTURAL_BUFF / 100)
+                struct_sl = min(raw_sl, closes[i] * (1 + config.SL_MAX_PCT / 100))
+        else:
+            struct_sl = 0.0
+
         e1 = closes[i]
         dca_prices, dca_margins, dca_contracts = [], [], []
         for idx, pct in enumerate(config.DCA_SPLITS):
@@ -582,8 +611,12 @@ def simulate(df: pd.DataFrame, df_5m: Optional[pd.DataFrame], symbol: str, p: di
             dca_margins.append(round(margin, 2))
             dca_contracts.append(round(contracts, 6))
 
-        trail_init = (e1 * (1 - p["trail_pct"] / 100) if direction == "long"
-                      else e1 * (1 + p["trail_pct"] / 100))
+        # Structural SL becomes the initial trail anchor — fires before standard trail
+        if args.structural_sl and struct_sl > 0:
+            trail_init = struct_sl
+        else:
+            trail_init = (e1 * (1 - p["trail_pct"] / 100) if direction == "long"
+                          else e1 * (1 + p["trail_pct"] / 100))
 
         active = Trade(
             symbol=symbol, direction=direction, score=score,
@@ -593,6 +626,7 @@ def simulate(df: pd.DataFrame, df_5m: Optional[pd.DataFrame], symbol: str, p: di
             avg_entry=e1, total_margin=dca_margins[0], total_contracts=dca_contracts[0],
             peak_price=e1, trail_stop=trail_init,
             dca_margin=dca_margins[0], sl_ref_price=round(e1, 6),
+            structural_sl_price=round(struct_sl, 6),
         )
         last_signal_bar = i
 
@@ -666,11 +700,12 @@ def _stats(trades: list[Trade], label: str, bars_per_day: int) -> dict:
         "total_pnl": total, "profit_factor": pf, "max_dd": max_dd, "sharpe": sharpe,
         "avg_hold_hrs": np.mean([t.hold_bars for t in trades]) / (bars_per_day / 24),
         "avg_fills":    np.mean([t.fills for t in trades]),
-        "sl_exits":     sum(1 for t in trades if t.exit_reason == "STOP_LOSS"),
-        "tp_exits":     sum(1 for t in trades if t.exit_reason == "TAKE_PROFIT"),
-        "trail_exits":  sum(1 for t in trades if t.exit_reason == "TRAIL_STOP"),
-        "confirm_exits":sum(1 for t in trades if t.exit_reason == "TRIPLE_CONFIRM"),
-        "open_exits":   sum(1 for t in trades if t.exit_reason == "OPEN_AT_END"),
+        "sl_exits":        sum(1 for t in trades if t.exit_reason == "STOP_LOSS"),
+        "tp_exits":        sum(1 for t in trades if t.exit_reason == "TAKE_PROFIT"),
+        "trail_exits":     sum(1 for t in trades if t.exit_reason == "TRAIL_STOP"),
+        "confirm_exits":   sum(1 for t in trades if t.exit_reason == "TRIPLE_CONFIRM"),
+        "time_stop_exits": sum(1 for t in trades if t.exit_reason == "TIME_STOP"),
+        "open_exits":      sum(1 for t in trades if t.exit_reason == "OPEN_AT_END"),
         "cushion_trades": sum(1 for t in trades if t.cushion_used > 0),
         "cushion_total":  sum(t.cushion_margin for t in trades),
     }
@@ -712,7 +747,7 @@ def print_results(trades: list[Trade], timeframe: str, max_pos: int,
               f"MaxDD: ${s['max_dd']:.2f} | Sharpe: {s['sharpe']:.2f}")
         print(f"  Avg hold: {s['avg_hold_hrs']:.1f}h | "
               f"TP={s['tp_exits']} SL={s['sl_exits']} Trail={s['trail_exits']} "
-              f"Confirm={s['confirm_exits']} Open={s['open_exits']}")
+              f"TimeStop={s['time_stop_exits']} Confirm={s['confirm_exits']} Open={s['open_exits']}")
         print(f"  Cushion: {s['cushion_trades']} trades | ${s['cushion_total']:.0f} injected")
     print("═" * W)
 
